@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System One Computer Use</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #16181d; --muted: #646b78; --line: #e2e5ea;
+    --accent: #2f6fed; --ok: #1f8a4c; --bad: #c8372d; --warn: #b26b00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111317; --card: #1a1d23; --text: #e8eaee; --muted: #9aa1ad; --line: #2b2f37;
+            --accent: #6b9bff; --ok: #4cc27f; --bad: #ff6b60; --warn: #f0a63a; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .wrap { display: grid; grid-template-columns: 340px 1fr; gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; padding: 16px; } }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 22px 0 8px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  textarea { width: 100%; min-height: 90px; resize: vertical; padding: 10px; border-radius: 8px; border: 1px solid var(--line);
+             background: var(--bg); color: var(--text); font: inherit; }
+  .buttons { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
+           background: var(--card); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .45; cursor: default; }
+  .error { color: var(--bad); font-size: 13px; margin-top: 8px; }
+  .warning { color: var(--bad); border: 1px solid var(--bad); border-radius: 8px; padding: 8px 12px; margin-top: 10px;
+             background: color-mix(in srgb, var(--bad) 10%, transparent); font-weight: 500; }
+  .warn-dot { color: var(--bad); font-weight: 700; }
+  .runs { list-style: none; margin: 0; padding: 0; }
+  .runs li { padding: 10px 12px; border-radius: 8px; cursor: pointer; border: 1px solid transparent;
+             display: flex; gap: 10px; align-items: center; }
+  .runs li > .info { flex: 1; min-width: 0; }
+  .runs input[type=checkbox] { width: 16px; height: 16px; flex: none; cursor: pointer; }
+  .icon { padding: 5px; border: 0; background: none; color: var(--muted); display: flex; border-radius: 6px; flex: none; }
+  .icon:hover:not(:disabled) { color: var(--bad); background: var(--bg); }
+  .tabs { display: flex; gap: 4px; margin: 22px 0 8px; border-bottom: 1px solid var(--line); }
+  .tab { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 10px;
+         color: var(--muted); font-weight: 600; }
+  .tab.on { color: var(--text); border-bottom-color: var(--accent); }
+  .trashbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 4px 12px 10px; }
+  .trashbar label { display: flex; gap: 8px; align-items: center; margin-right: auto; font-size: 13px; cursor: pointer; }
+  .trashbar button { padding: 5px 10px; font-size: 13px; }
+  button.danger { color: var(--bad); border-color: var(--bad); }
+  .runs li:hover { background: var(--card); }
+  .runs li.sel { background: var(--card); border-color: var(--line); }
+  .runs .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 99px;
+          border: 1px solid currentColor; }
+  .s-running { color: var(--accent); } .s-done { color: var(--ok); }
+  .s-failed { color: var(--bad); } .s-stopped, .s-gave_up, .s-unsure { color: var(--warn); } .s-dry_run { color: var(--muted); }
+  .head { display: flex; justify-content: space-between; gap: 12px; align-items: start; flex-wrap: wrap; }
+  .stats { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; }
+  .step { display: grid; grid-template-columns: minmax(0, 3fr) minmax(220px, 2fr); gap: 16px; margin-top: 14px; }
+  @media (max-width: 1000px) { .step { grid-template-columns: 1fr; } }
+  .step img { width: 100%; border-radius: 6px; border: 1px solid var(--line); display: block; cursor: zoom-in; }
+  .action { font-size: 18px; font-weight: 700; }
+  .num { color: var(--muted); font-weight: 400; }
+  .detail { font-family: ui-monospace, Menlo, monospace; font-size: 13px; word-break: break-all; margin: 4px 0 8px; }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin: 2px 0 10px; }
+  .bar > div { height: 100%; background: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td { padding: 3px 0; } td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.chosen td { font-weight: 700; }
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside>
+    <h1>System One Computer Use</h1>
+    <div class="muted">Takes a screenshot, asks JEV what to do, then clicks or types. Repeats until done.</div>
+    <h2>New task</h2>
+    <div class="card">
+      <textarea id="task" placeholder='Go to x.com and post "Hello from my JEV agent!"'></textarea>
+      <div class="muted">Put text it should type in "quotes". Name websites like x.com.</div>
+      <div class="buttons">
+        <button class="primary" id="run">Run</button>
+        <button id="dry" title="Open the website and show JEV's first decision, without clicking or typing">Dry run</button>
+        <button id="stop" disabled>Stop</button>
+      </div>
+      <label class="muted" style="display:flex;gap:8px;align-items:center;margin-top:10px;cursor:pointer">
+        <input type="checkbox" id="closetabs" checked> Close the tabs it opened when it finishes
+      </label>
+      <div class="error" id="err"></div>
+      <div class="muted" style="margin-top:8px">While a task runs, the agent controls your mouse and keyboard.
+        To stop it right away, move the mouse into any screen corner.</div>
+    </div>
+    <div class="tabs">
+      <button class="tab on" id="tab-runs">Runs</button>
+      <button class="tab" id="tab-trash">Trash</button>
+    </div>
+    <div class="trashbar" id="trashbar" hidden>
+      <label><input type="checkbox" id="all"> Select all</label>
+      <button id="restore" disabled>Restore</button>
+      <button id="purge" class="danger" disabled>Delete forever</button>
+    </div>
+    <ul class="runs" id="runs"></ul>
+  </aside>
+  <main id="report"><div class="card empty">Run a task, or pick one from the list.</div></main>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+let view = "runs", selected = null, active = null, lastJson = "", runs = [];
+const checked = new Set();  // runs ticked in the Trash tab
+const TRASH_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>`;
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pct = v => v == null ? "–" : Math.round(v * 100) + "%";
+// Costs are fractions of a cent, so show 2 significant digits: $0.00031.
+const money = v => v == null ? "–" : v === 0 ? "$0" : v >= 0.01 ? "$" + v.toFixed(2) : "$" + v.toPrecision(2).replace(/0+$/, "");
+const PRICE = 0.042 / 1e6;  // per input token; for runs saved before costs were recorded
+const LABEL = {running: "Running", done: "Done", failed: "Failed", stopped: "Stopped", gave_up: "Gave up", unsure: "Needs help", dry_run: "Dry run"};
+
+async function api(path, body) {
+  const r = await fetch(path, body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : {});
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || r.statusText);
+  return data;
+}
+
+async function start(dry) {
+  $("err").textContent = "";
+  try {
+    const {id} = await api("/api/run", {task: $("task").value, dry_run: dry, close_tabs: $("closetabs").checked});
+    selected = id; await refresh();
+  } catch (e) { $("err").textContent = e.message; }
+}
+try { $("closetabs").checked = localStorage.getItem("closetabs") !== "no"; } catch {}
+$("closetabs").onchange = () => { try { localStorage.setItem("closetabs", $("closetabs").checked ? "yes" : "no"); } catch {} };
+$("run").onclick = () => start(false);
+$("dry").onclick = () => start(true);
+$("stop").onclick = () => api("/api/stop", {});
+
+function clearReport() {
+  selected = null; lastJson = "";
+  $("report").innerHTML = `<div class="card empty">${view === "trash" ? "Pick a run in the trash to look at it." : "Run a task, or pick one from the list."}</div>`;
+}
+
+function switchView(v) {
+  view = v; checked.clear(); clearReport();
+  $("tab-runs").classList.toggle("on", v === "runs");
+  $("tab-trash").classList.toggle("on", v === "trash");
+  $("trashbar").hidden = v !== "trash";
+  refresh();
+}
+$("tab-runs").onclick = () => switchView("runs");
+$("tab-trash").onclick = () => switchView("trash");
+
+async function trash(ids) {
+  await api("/api/trash", {ids});
+  if (ids.includes(selected)) clearReport();
+  refresh();
+}
+$("all").onchange = e => { runs.forEach(r => e.target.checked ? checked.add(r.id) : checked.delete(r.id)); render(); };
+$("restore").onclick = async () => { await api("/api/restore", {ids: [...checked]}); afterTrashAction(); };
+$("purge").onclick = async () => {
+  const n = checked.size;
+  if (!confirm(`Delete ${n} run${n === 1 ? "" : "s"} forever? The screenshots and reports can't be recovered.`)) return;
+  await api("/api/delete", {ids: [...checked]});
+  afterTrashAction();
+};
+function afterTrashAction() {
+  if (checked.has(selected)) clearReport();
+  checked.clear(); refresh();
+}
+
+async function refresh() {
+  const data = await api(`/api/${view}`);
+  runs = data.runs; active = data.active;
+  $("run").disabled = $("dry").disabled = !!active;
+  $("stop").disabled = !active;
+  $("tab-trash").textContent = data.trash_count ? `Trash (${data.trash_count})` : "Trash";
+  [...checked].forEach(id => runs.some(r => r.id === id) || checked.delete(id));
+  render();
+  if (selected) await showReport(selected);
+}
+
+function render() {
+  const inTrash = view === "trash";
+  $("runs").innerHTML = runs.map(r => `
+    <li data-id="${r.id}" class="${r.id === selected ? "sel" : ""}">
+      ${inTrash ? `<input type="checkbox" data-check="${r.id}" ${checked.has(r.id) ? "checked" : ""} aria-label="Select run">` : ""}
+      <div class="info">
+        <div class="t">${esc(r.task)}</div>
+        <div class="muted"><span class="pill s-${r.status}">${LABEL[r.status] || r.status}</span>
+          ${r.steps} step${r.steps === 1 ? "" : "s"} · ${money(r.cost_usd)} · ${esc(r.started.replace("T", " "))}
+          ${r.warning ? `<span class="warn-dot" title="This run has a warning">⚠</span>` : ""}</div>
+      </div>
+      ${inTrash ? "" : `<button class="icon" data-trash="${r.id}" title="Move to trash" aria-label="Move to trash"
+          ${r.id === active ? "disabled" : ""}>${TRASH_ICON}</button>`}
+    </li>`).join("") || `<li class="muted">${inTrash ? "Trash is empty." : "No runs yet."}</li>`;
+  document.querySelectorAll(".runs li[data-id]").forEach(li => li.onclick = e => {
+    if (e.target.closest("input, button")) return;
+    selected = li.dataset.id; lastJson = ""; refresh();
+  });
+  document.querySelectorAll("[data-trash]").forEach(b => b.onclick = () => trash([b.dataset.trash]));
+  document.querySelectorAll("[data-check]").forEach(c => c.onchange = () => {
+    c.checked ? checked.add(c.dataset.check) : checked.delete(c.dataset.check); render();
+  });
+  $("all").checked = runs.length > 0 && checked.size === runs.length;
+  $("all").disabled = !runs.length;
+  $("restore").disabled = $("purge").disabled = !checked.size;
+  $("purge").textContent = checked.size ? `Delete forever (${checked.size})` : "Delete forever";
+}
+
+async function showReport(id) {
+  let r;
+  try { r = await api(`/api/${view}/${id}`); } catch { return clearReport(); }
+  const json = JSON.stringify(r);
+  if (json === lastJson) return;  // nothing new; don't redraw (keeps scroll position)
+  lastJson = json;
+  const steps = r.steps.map(s => {
+    const options = Object.entries(s.options).slice(0, 4).map(([k, v]) =>
+      `<tr class="${k === s.action ? "chosen" : ""}"><td>${k}</td><td>${pct(v)}</td></tr>`).join("");
+    const img = `/${view}/${id}/${s.image}`;
+    return `
+    <div class="card step">
+      <a href="${img}" target="_blank"><img src="${img}" alt="Screenshot before step ${s.n}" loading="lazy"></a>
+      <div>
+        <div class="action"><span class="num">Step ${s.n} ·</span> ${s.action}</div>
+        ${s.detail ? `<div class="detail">${esc(s.detail)}</div>` : ""}
+        <div class="muted">${esc(s.why)}</div>
+        <div class="muted" style="margin-top:10px">How sure JEV was: ${pct(s.confidence)}</div>
+        <div class="bar"><div style="width:${pct(s.confidence)}"></div></div>
+        ${s.target_box ? `<div class="muted">Click target confidence: ${pct(s.target_confidence)} (red box on the screenshot)</div>` : ""}
+        <h2 style="margin-top:14px">Other options JEV considered</h2>
+        <table>${options}</table>
+        <div class="muted" style="margin-top:10px">${esc(s.result || "Deciding…")} · JEV took ${s.jev_seconds}s${s.wait ? ` · waited ${s.wait.waited}s for the screen${s.wait.timed_out ? " (gave up: something kept moving)" : ""}` : ""}${s.seconds ? ` · step took ${s.seconds}s` : ""}
+          · ≈ ${money(s.cost_usd ?? (s.tokens?.input_tokens || 0) * PRICE)}</div>
+      </div>
+    </div>`;
+  }).join("");
+  $("report").innerHTML = `
+    <div class="card">
+      <div class="head">
+        <div style="font-size:17px;font-weight:600">${esc(r.task)}</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="pill s-${r.status}">${LABEL[r.status] || r.status}</span>
+          ${view === "runs" && id !== active ? `<button class="icon" id="trash-this" title="Move to trash" aria-label="Move to trash">${TRASH_ICON}</button>` : ""}
+          ${view === "trash" ? `<span class="muted">In trash</span>` : ""}
+        </div>
+      </div>
+      ${r.message ? `<div style="margin-top:6px">${esc(r.message)}</div>` : ""}
+      ${r.warning ? `<div class="warning" role="alert">⚠ ${esc(r.warning)}</div>` : ""}
+      <div class="stats muted">
+        <span>Started ${esc(r.started.replace("T", " "))}</span>
+        ${r.opened ? `<span>Opened ${esc(r.opened)} first</span>` : ""}
+        ${r.closed_tabs ? `<span>Closed ${r.closed_tabs} tab${r.closed_tabs === 1 ? "" : "s"} it opened</span>` : ""}
+        <span>${r.steps.length} steps${r.seconds ? ` in ${Math.round(r.seconds)}s` : ""}</span>
+        <span title="JEV charges $0.042 per million input tokens; output is free">≈ ${money(r.cost_usd ?? r.input_tokens * PRICE)}
+          (${(r.input_tokens + r.output_tokens).toLocaleString()} JEV tokens)</span>
+        <span>Quoted text: ${r.can_type.length ? r.can_type.map(t => `“${esc(t)}”`).join(", ") : "nothing"}</span>
+        <span>Websites: ${r.websites.length ? esc(r.websites.join(", ")) : "none"}</span>
+      </div>
+    </div>
+    ${steps || `<div class="card empty">${r.status === "running" ? "Working…" : "No steps."}</div>`}`;
+  if ($("trash-this")) $("trash-this").onclick = () => trash([id]);
+}
+
+refresh();
+setInterval(() => { if (active) refresh(); }, 1500);
+</script>
+</body>
+</html>
