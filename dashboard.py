@@ -16,6 +16,7 @@ from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import jev_agent
+import phone as phone_module
 
 PORT = 8000
 PAGE = Path(__file__).with_name("dashboard.html")
@@ -122,15 +123,28 @@ def run_then_show_dashboard(*args, **kwargs):
     show_dashboard()
 
 
-def start(task, dry_run, close_tabs=True):
+def phone_status():
+    """Is an Android phone connected and allowed? {"ok": True, "name": ...} or {"ok": False, "error": ...}"""
+    try:
+        return {"ok": True, "name": phone_module.AndroidPhone().name}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def start(task, dry_run, close_tabs=True, device="computer"):
     if is_running():
         raise ValueError("A task is already running. Stop it first.")
+    if device not in ("computer", "android"):
+        raise ValueError("Choose Computer or Android phone.")
+    if device == "android" and not (status := phone_status())["ok"]:
+        raise ValueError(status["error"])
     if not task.strip():
         raise ValueError("Enter a task.")
     run_dir = jev_agent.new_run_dir()
     stop = threading.Event()
     thread = threading.Thread(target=run_then_show_dashboard, args=(task, run_dir, stop),
-                              kwargs={"dry_run": dry_run, "close_opened_tabs": close_tabs}, daemon=True)
+                              kwargs={"dry_run": dry_run, "close_opened_tabs": close_tabs, "device": device},
+                              daemon=True)
     active.update(thread=thread, id=run_dir.name, stop=stop)
     thread.start()
     return run_dir.name
@@ -178,6 +192,8 @@ class Handler(BaseHTTPRequestHandler):
         if len(parts) == 2 and parts[0] == "api" and parts[1] in FOLDERS:
             return self.send({"runs": list_runs(FOLDERS[parts[1]]), "trash_count": len(list_runs(TRASH_DIR)),
                               "active": active["id"] if is_running() else None})
+        if parts == ["api", "phone"]:
+            return self.send(phone_status())
         if len(parts) == 3 and parts[0] == "api" and parts[1] in FOLDERS and RUN_ID.match(parts[2]):
             report = FOLDERS[parts[1]] / parts[2] / "report.json"
             if report.exists():
@@ -195,7 +211,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/run":
             try:
                 return self.send({"id": start(body.get("task", ""), bool(body.get("dry_run")),
-                                              body.get("close_tabs", True) is not False)})
+                                              body.get("close_tabs", True) is not False,
+                                              body.get("device", "computer"))})
             except ValueError as exc:
                 return self.send({"error": str(exc)}, status=400)
         if self.path == "/api/stop":

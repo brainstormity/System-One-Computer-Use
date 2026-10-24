@@ -10,13 +10,14 @@
 > **Tested on:** macOS with Brave, Python 3.14. Windows and Linux are untested; typing by paste, copying links
 > and closing tabs only work on macOS.
 
-Controls your computer with screenshots. In a loop:
+Controls your computer, or an Android phone, with screenshots. In a loop:
 
 1. Take a screenshot.
 2. Ask JEV what to do next: click, type, press Enter, scroll, open a website, or stop because it's done.
 3. Do it with `pyautogui`.
 
-The agent is one file, [`jev_agent.py`](jev_agent.py). A small web dashboard, [`dashboard.py`](dashboard.py), runs tasks and shows reports.
+The agent is one file, [`jev_agent.py`](jev_agent.py). [`phone.py`](phone.py) adds Android phones (Mobile Use).
+A small web dashboard, [`dashboard.py`](dashboard.py), runs tasks and shows reports.
 
 ## Setup
 
@@ -76,6 +77,52 @@ Each run is saved in `runs/<time>/`: the screenshots plus `report.json`.
 
 Make sure you're already logged in to sites like X. The agent can't log in for you.
 
+## Mobile Use (Android)
+
+The same agent can control an Android phone connected to your Mac. It sees the phone's screen and taps, types,
+swipes and uses the Back and Home buttons, so it can move between apps like you would. For example:
+
+> Open X and post a tweet with the text "Hello from my phone!"
+
+It opens the X app, taps the compose button, types the text and taps Post.
+
+**Setup (once):**
+
+1. Install adb, Google's tool for controlling Android phones: `brew install --cask android-platform-tools`
+2. On the phone: **Settings → About phone**, tap **Build number** 7 times. Then **Settings → System →
+   Developer options**: turn on **USB debugging** (and **USB debugging (Security settings)** if your phone has it).
+3. Plug the phone in by USB, unlock it and tap **Allow** on "Allow USB debugging?" (tick **Always allow**).
+
+**No phone? Use the Android emulator.** Google's free emulator runs a virtual Android phone in a window on
+your Mac, and the agent controls it exactly like a real one. About 3 GB of downloads (Apple Silicon Macs;
+on Intel Macs use `x86_64` instead of `arm64-v8a`):
+
+```bash
+brew install openjdk@21
+brew install --cask android-commandlinetools android-platform-tools
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21 ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
+sdkmanager --licenses   # read and accept Google's Android SDK license
+sdkmanager "platform-tools" "emulator" "platforms;android-35" "system-images;android-35;google_apis_playstore;arm64-v8a"
+avdmanager create avd -n SystemOnePhone -d pixel_7 -k "system-images;android-35;google_apis_playstore;arm64-v8a"
+$ANDROID_HOME/emulator/emulator -avd SystemOnePhone
+```
+
+The last command opens the virtual phone (run it again whenever you want it). Inside it, open the Play
+Store, sign in with a Google account and install the apps you want the agent to use (X, Instagram…).
+
+**Run:** in the dashboard, choose **📱 Android phone** (it shows whether your phone is connected), or:
+
+```bash
+python jev_agent.py --android 'Open X and post a tweet with the text "Hello from my phone!"'
+```
+
+- **Apps named in your task open directly** if they're installed (X, Instagram, WhatsApp, YouTube, Chrome,
+  Gmail, Spotify… see `KNOWN_APPS` in `phone.py`). Other apps it finds on the home screen like you would.
+- **Typing is plain text only**: adb can't type emoji or accented letters.
+- **Not yet on the phone:** copying a link and pasting it. **iPhone isn't supported**: iOS doesn't let
+  one app see or tap other apps.
+- **To stop it**, press **Stop** in the dashboard or unplug the phone. Be logged in to apps first.
+
 ## How it works (for building on it)
 
 Everything happens in `run_task()` in [`jev_agent.py`](jev_agent.py):
@@ -85,8 +132,11 @@ Everything happens in `run_task()` in [`jev_agent.py`](jev_agent.py):
    - a `choice` question: which action from `ACTIONS` comes next
    - a `box` question: where on the screen to click
    - a `choice` question: which text to type
-3. **Do it** with `pyautogui`, then wait until the screen has reacted and settled (`wait_for_screen()`).
-4. **Save the step** to `runs/<time>/report.json` with its screenshot, and repeat until JEV picks `DONE`.
+3. **Zoom in if needed.** When JEV is unsure where to click or tap (under 60%), or the last click at that spot
+   did nothing, it asks again on an enlarged close-up of that area (`refine_target()`). Small targets like
+   the numbers on a clock dial need this.
+4. **Do it** with `pyautogui`, then wait until the screen has reacted and settled (`wait_for_screen()`).
+5. **Save the step** to `runs/<time>/report.json` with its screenshot, and repeat until JEV picks `DONE`.
 
 JEV picks from options; it never writes free text. So the agent offers it only:
 
@@ -101,6 +151,10 @@ A side effect: text on a web page can't make the agent type something that isn't
 
 **Tuning:** `MIN_CONFIDENCE` and `MIN_CONFIDENCE_HARMLESS` decide when it stops instead of guessing. `MAX_STEPS`
 caps a run.
+
+**Mobile Use** swaps only the "eyes and hands": `phone.py` takes the screenshot and taps, swipes and types
+over adb, and `PHONE_ACTIONS` gives JEV the phone's actions (tap, swipe, Back, Home, open app…). The loop,
+waiting logic and reports are shared.
 
 **The dashboard** ([`dashboard.py`](dashboard.py) and [`dashboard.html`](dashboard.html)) uses only Python's
 standard library. It runs `run_task()` in a background thread and reads the same `report.json` files.

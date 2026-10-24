@@ -31,6 +31,11 @@
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   button:disabled { opacity: .45; cursor: default; }
   .error { color: var(--bad); font-size: 13px; margin-top: 8px; }
+  .devices { display: flex; gap: 4px; padding: 3px; background: var(--bg); border: 1px solid var(--line);
+             border-radius: 9px; margin-bottom: 10px; }
+  .devices button { flex: 1; border: 0; background: none; padding: 6px 10px; border-radius: 7px; color: var(--muted); }
+  .devices button.on { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+  .phone-status { font-size: 13px; margin: -2px 0 8px; }
   .warning { color: var(--bad); border: 1px solid var(--bad); border-radius: 8px; padding: 8px 12px; margin-top: 10px;
              background: color-mix(in srgb, var(--bad) 10%, transparent); font-weight: 500; }
   .warn-dot { color: var(--bad); font-weight: 700; }
@@ -79,18 +84,23 @@
     <div class="muted">Takes a screenshot, asks JEV what to do, then clicks or types. Repeats until done.</div>
     <h2>New task</h2>
     <div class="card">
+      <div class="devices" role="radiogroup" aria-label="What to control">
+        <button id="dev-computer" class="on" role="radio" aria-checked="true">🖥️ Computer</button>
+        <button id="dev-android" role="radio" aria-checked="false">📱 Android phone</button>
+      </div>
+      <div class="phone-status muted" id="phonestatus" hidden></div>
       <textarea id="task" placeholder='Go to x.com and post "Hello from my JEV agent!"'></textarea>
-      <div class="muted">Put text it should type in "quotes". Name websites like x.com.</div>
+      <div class="muted" id="hint">Put text it should type in "quotes". Name websites like x.com.</div>
       <div class="buttons">
         <button class="primary" id="run">Run</button>
         <button id="dry" title="Open the website and show JEV's first decision, without clicking or typing">Dry run</button>
         <button id="stop" disabled>Stop</button>
       </div>
-      <label class="muted" style="display:flex;gap:8px;align-items:center;margin-top:10px;cursor:pointer">
+      <label id="closetabs-row" class="muted" style="display:flex;gap:8px;align-items:center;margin-top:10px;cursor:pointer">
         <input type="checkbox" id="closetabs" checked> Close the tabs it opened when it finishes
       </label>
       <div class="error" id="err"></div>
-      <div class="muted" style="margin-top:8px">While a task runs, the agent controls your mouse and keyboard.
+      <div class="muted" id="safety" style="margin-top:8px">While a task runs, the agent controls your mouse and keyboard.
         To stop it right away, move the mouse into any screen corner.</div>
     </div>
     <div class="tabs">
@@ -129,10 +139,36 @@ async function api(path, body) {
 async function start(dry) {
   $("err").textContent = "";
   try {
-    const {id} = await api("/api/run", {task: $("task").value, dry_run: dry, close_tabs: $("closetabs").checked});
+    const {id} = await api("/api/run", {task: $("task").value, dry_run: dry, close_tabs: $("closetabs").checked, device});
     selected = id; await refresh();
   } catch (e) { $("err").textContent = e.message; }
 }
+// Computer Use or Mobile Use: the same agent, a different screen and set of actions.
+let device = "computer";
+async function setDevice(d) {
+  device = d;
+  try { localStorage.setItem("device", d); } catch {}
+  $("dev-computer").classList.toggle("on", d === "computer");
+  $("dev-android").classList.toggle("on", d === "android");
+  $("dev-computer").setAttribute("aria-checked", d === "computer");
+  $("dev-android").setAttribute("aria-checked", d === "android");
+  $("closetabs-row").hidden = d === "android";
+  $("task").placeholder = d === "android" ? 'Open X and post "Hello from my phone!"' : 'Go to x.com and post "Hello from my JEV agent!"';
+  $("phonestatus").hidden = d !== "android";
+  $("hint").textContent = d === "android" ? 'Put text it should type in "quotes". Name apps like X, Instagram or WhatsApp.'
+                                          : 'Put text it should type in "quotes". Name websites like x.com.';
+  $("safety").textContent = d === "android"
+    ? "While a task runs, the agent taps and types on your phone. To stop it, press Stop or unplug the phone."
+    : "While a task runs, the agent controls your mouse and keyboard. To stop it right away, move the mouse into any screen corner.";
+  if (d === "android") {
+    $("phonestatus").textContent = "Looking for your phone…";
+    const s = await api("/api/phone");
+    $("phonestatus").innerHTML = s.ok ? `✅ Connected: ${esc(s.name)}` : `<span style="color:var(--bad)">⚠ ${esc(s.error)}</span>`;
+  }
+}
+$("dev-computer").onclick = () => setDevice("computer");
+$("dev-android").onclick = () => setDevice("android");
+try { if (localStorage.getItem("device") === "android") setDevice("android"); } catch {}
 try { $("closetabs").checked = localStorage.getItem("closetabs") !== "no"; } catch {}
 $("closetabs").onchange = () => { try { localStorage.setItem("closetabs", $("closetabs").checked ? "yes" : "no"); } catch {} };
 $("run").onclick = () => start(false);
@@ -252,6 +288,7 @@ async function showReport(id) {
       ${r.warning ? `<div class="warning" role="alert">⚠ ${esc(r.warning)}</div>` : ""}
       <div class="stats muted">
         <span>Started ${esc(r.started.replace("T", " "))}</span>
+        <span>${r.device === "android" ? `📱 ${esc(r.device_name || "Android phone")}` : "🖥️ Computer"}</span>
         ${r.opened ? `<span>Opened ${esc(r.opened)} first</span>` : ""}
         ${r.closed_tabs ? `<span>Closed ${r.closed_tabs} tab${r.closed_tabs === 1 ? "" : "s"} it opened</span>` : ""}
         <span>${r.steps.length} steps${r.seconds ? ` in ${Math.round(r.seconds)}s` : ""}</span>
