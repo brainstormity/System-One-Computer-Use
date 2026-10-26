@@ -66,6 +66,10 @@
   .step { display: grid; grid-template-columns: minmax(0, 3fr) minmax(220px, 2fr); gap: 16px; margin-top: 14px; }
   @media (max-width: 1000px) { .step { grid-template-columns: 1fr; } }
   .step img { width: 100%; border-radius: 6px; border: 1px solid var(--line); display: block; cursor: zoom-in; }
+  /* Phone screenshots are tall: show them phone-sized next to the details; click to open full size. */
+  .step.phone { grid-template-columns: 220px minmax(0, 1fr); }
+  .step.phone img { border-radius: 14px; }
+  @media (max-width: 1000px) { .step.phone { grid-template-columns: 1fr; } .step.phone a { max-width: 220px; } }
   .action { font-size: 18px; font-weight: 700; }
   .num { color: var(--muted); font-weight: 400; }
   .detail { font-family: ui-monospace, Menlo, monospace; font-size: 13px; word-break: break-all; margin: 4px 0 8px; }
@@ -258,8 +262,8 @@ async function showReport(id) {
       `<tr class="${k === s.action ? "chosen" : ""}"><td>${k}</td><td>${pct(v)}</td></tr>`).join("");
     const img = `/${view}/${id}/${s.image}`;
     return `
-    <div class="card step">
-      <a href="${img}" target="_blank"><img src="${img}" alt="Screenshot before step ${s.n}" loading="lazy"></a>
+    <div class="card step${r.device === "android" ? " phone" : ""}">
+      <a href="${img}" target="_blank" title="Open full size"><img src="${img}" alt="Screenshot before step ${s.n}" loading="lazy"></a>
       <div>
         <div class="action"><span class="num">Step ${s.n} ·</span> ${s.action}</div>
         ${s.detail ? `<div class="detail">${esc(s.detail)}</div>` : ""}
